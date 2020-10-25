@@ -4,7 +4,6 @@
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
 #include <ESP8266HTTPUpdateServer.h>
-// #include "ESP8266_hwTimer.h"
 
 void BeginWebUpdate(void);
 void HandleWebUpdate(void);

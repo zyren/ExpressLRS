@@ -1,23 +1,17 @@
 #include "ESP8266_WebUpdate.h"
 
-// #if defined(Regulatory_Domain_AU_915) || defined(Regulatory_Domain_EU_868) || defined(Regulatory_Domain_FCC_915) || defined(Regulatory_Domain_AU_433) || defined(Regulatory_Domain_EU_433)
-// #include "SX127xDriver.h"
-// extern SX127xDriver Radio;
-// #endif
+#ifdef VRX_BACKPACK
+  #define STASSID "ExpressLRS VRx Backpack"
+#endif
+#ifdef TX_BACKPACK
+  #define STASSID "ExpressLRS Tx Backpack"
+#endif
 
-// #if defined(Regulatory_Domain_ISM_2400)
-// #include "SX1280Driver.h"
-// extern SX1280Driver Radio;
-// #endif
-
-#define STASSID "ExpressLRS RX"
 #define STAPSK "expresslrs"
 const char *myHostname = "expresslrs";
 
 const char *ssid = STASSID;
 const char *password = STAPSK;
-
-// extern hwTimer hwTimer;
 
 const byte DNS_PORT = 53;
 IPAddress apIP(10, 0, 0, 1);
@@ -114,14 +108,7 @@ void WebUpdateHandleNotFound()
 
 void BeginWebUpdate(void)
 {
-  // hwTimer.stop();
-
-  // Radio.RXdoneCallback = NULL;
-  // Radio.TXdoneCallback = NULL;
-
   Serial.println("Begin Webupdater");
-  // Serial.println("Stopping Radio");
-  // Radio.End();
 
   server.on("/", WebUpdateHandleRoot);
   server.on("/css.css", WebUpdateSendcss);

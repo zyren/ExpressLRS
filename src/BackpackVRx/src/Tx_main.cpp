@@ -1,5 +1,10 @@
-#include <ESP8266WiFi.h>
+#include <Arduino.h>
+#include "ESP8266_WebUpdate.h"
 #include <espnow.h>
+#include <EEPROM.h>
+
+bool startWebUpdater = false;
+uint8_t channelHistory[3] = {255};
 
 void OnDataRecv(uint8_t * mac_addr, uint8_t *data, uint8_t data_len)
 {
@@ -7,25 +12,36 @@ void OnDataRecv(uint8_t * mac_addr, uint8_t *data, uint8_t data_len)
   {
     Serial.write(data[i]);
   }
+
+  channelHistory[2] = channelHistory[1];
+  channelHistory[1] = channelHistory[0];
+  channelHistory[0] = data[8];
 } 
 
 void setup()
 {
-  Serial.begin(115200); 
-  /*
-    CURRENTLY NOT REQUIRED! LEAVE SERIAL UNINVERTED WITH DIRECT CONNECTION TO UART2 PINS
-    Use inverted for r9m
-  */
-  // Serial.begin(115200, SERIAL_8N1, SERIAL_FULL, 1, true); // https://github.com/dok-net/arduino-esp8266/blob/master/cores/esp8266/HardwareSerial.h#L92
+  Serial.begin(115200);
 
-  WiFi.mode(WIFI_STA);
-
-  if(esp_now_init() != 0)
+  EEPROM.begin(512);
+  EEPROM.get(0, startWebUpdater);
+  
+  if (startWebUpdater)
   {
-    ESP.restart();
+    EEPROM.put(0, false);
+    EEPROM.commit();  
+    BeginWebUpdate();
   }
+  else
+  {
+    WiFi.mode(WIFI_STA);
 
-  esp_now_register_recv_cb(OnDataRecv); 
+    if(esp_now_init() != 0)
+    {
+      ESP.restart();
+    }
+
+    esp_now_register_recv_cb(OnDataRecv); 
+  }
 } 
 
 void loop()
@@ -35,4 +51,19 @@ void loop()
   */
   // Serial.println(WiFi.macAddress());
   // delay(1000);
+  
+  // A1, A2, A1 Select this channel order to start webupdater 
+  if (channelHistory[0] == 0 && channelHistory[1] == 1 && channelHistory[2] == 0)
+  {
+    EEPROM.put(0, true);
+    EEPROM.commit();  
+    Serial.println("Restarting in webupdater mode...");
+    delay(500);
+    ESP.restart();
+  }
+  
+  if (startWebUpdater)
+  {
+    HandleWebUpdate();
+  }
 }
