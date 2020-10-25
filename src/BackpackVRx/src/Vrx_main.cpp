@@ -157,6 +157,7 @@ void loop()
     EEPROM.put(0, true);
     EEPROM.commit();  
     Serial.println("Restarting in webupdater mode...");
+    delay(500);
     ESP.restart();
   }
 
@@ -168,7 +169,8 @@ void loop()
   {
     if (gotData)
     {
-      Serial.println(spiData, BIN);
+      gotData = false;
+      // Serial.println(spiData, BIN);
       // Serial.println(numberOfBitsReceived);
 
       if ((spiData & ADDRESS_BITS) == SPI_ADDRESS_SYNTH_B)
@@ -179,6 +181,7 @@ void loop()
         {
           if (((spiData >> 5) & DATA_BITS) == hexFreqTable[i])
           {
+            Serial.print("Channel index: ");
             Serial.println(i);
             
             uint8_t payload[4] = {i, 0, 1, 0};
@@ -187,11 +190,19 @@ void loop()
             channelHistory[2] = channelHistory[1];
             channelHistory[1] = channelHistory[0];
             channelHistory[0] = i;
+
+            Serial.print("channelHistory: [");
+            Serial.print(channelHistory[0]);
+            Serial.print(", ");
+            Serial.print(channelHistory[1]);
+            Serial.print(", ");
+            Serial.print(channelHistory[2]);
+            Serial.println("]");
+
+            return;
           }
         }
       }
-
-      gotData = false;
     }
   }
 }
