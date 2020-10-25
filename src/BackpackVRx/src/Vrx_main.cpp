@@ -29,7 +29,7 @@ uint16_t hexFreqTable[] = {
 0x2609, 0x261C, 0x268E, 0x2701, 0x2713, 0x2786, 0x2798, 0x280B  // L
 };
 
-uint8_t broadcastAddress[] = {0xD8, 0xF1, 0x5B, 0xE4, 0x6B, 0xA6};  // r9 tx    50:02:91:DA:37:84
+uint8_t broadcastAddress[] = {TX_MAC};  // r9 tx    50:02:91:DA:37:84
 
 uint32_t spiData = 0;
 bool mosiVal = false;
