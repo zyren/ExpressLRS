@@ -1,10 +1,13 @@
-#include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <espnow.h>
 
-#define PIN_SPI_MOSI        13
-#define PIN_SPI_CLK         14
-#define PIN_SPI_CS          15
+#include <Arduino.h>
+#include "ESP8266_WebUpdate.h"
+// #include <ESP8266WiFi.h>
+#include <espnow.h>
+#include <EEPROM.h>
+
+#define PIN_MOSI            13
+#define PIN_CLK             14
+#define PIN_CS              12
 #define ADDRESS_BITS        0x0F
 #define DATA_BITS           0xFFFFF
 #define SPI_ADDRESS_SYNTH_B 0x01
@@ -34,6 +37,8 @@ uint32_t spiData = 0;
 bool mosiVal = false;
 uint8_t numberOfBitsReceived = 0; // Takes into account 25b and 32b packets
 bool gotData = false;
+bool startWebUpdater = false;
+uint8_t channelHistory[3] = {255};
 
 void IRAM_ATTR spi_clk_isr();
 void IRAM_ATTR spi_cs_isr();
@@ -41,7 +46,7 @@ void IRAM_ATTR spi_mosi_isr();
 
 void IRAM_ATTR spi_cs_isr()
 {
-  if (digitalRead(PIN_SPI_CS) == HIGH)
+  if (digitalRead(PIN_CS) == HIGH)
   {
     spiData = spiData >> (32 - numberOfBitsReceived);
     gotData = true;
@@ -55,7 +60,7 @@ void IRAM_ATTR spi_cs_isr()
 
 void IRAM_ATTR spi_mosi_isr()
 {
-  mosiVal = digitalRead(PIN_SPI_MOSI);
+  mosiVal = digitalRead(PIN_MOSI);
 }
 
 void IRAM_ATTR spi_clk_isr()
@@ -104,60 +109,89 @@ void sendToExLRS(uint16_t function, uint16_t payloadSize, const uint8_t *payload
     nowDataOutput[payloadSize+8] = ck2;
 
     esp_now_send(broadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
-    // for (int i = 0; i < sizeof(broadcastAddress) / 6; i++)
-    // {
-    //     uint8_t tempBroadcastAddress[6];
-    //     memcpy(tempBroadcastAddress, broadcastAddress + (6 * i), 6);
-    //     esp_now_send(tempBroadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
-    // }
 }
 
 void setup()
 {
   Serial.begin(115200);
 
-  pinMode(PIN_SPI_MOSI, INPUT);
-  pinMode(PIN_SPI_CLK, INPUT);
-  pinMode(PIN_SPI_CS, INPUT);
+  EEPROM.begin(512);
+  EEPROM.get(0, startWebUpdater);
 
-  attachInterrupt(digitalPinToInterrupt(PIN_SPI_CS), spi_cs_isr, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(PIN_SPI_CLK), spi_clk_isr, RISING);
-  attachInterrupt(digitalPinToInterrupt(PIN_SPI_MOSI), spi_mosi_isr, CHANGE);
-
-  
-  WiFi.mode(WIFI_STA);
-
-  if (esp_now_init() != 0) {
-    Serial.println("Error initializing ESP-NOW");
-    return;
+  if (startWebUpdater)
+  {
+    EEPROM.put(0, false);
+    EEPROM.commit();  
+    BeginWebUpdate();
   }
+  else
+  {
+    pinMode(PIN_MOSI, INPUT);
+    pinMode(PIN_CLK, INPUT);
+    pinMode(PIN_CS, INPUT);
 
-  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
-  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+    attachInterrupt(digitalPinToInterrupt(PIN_CS), spi_cs_isr, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PIN_CLK), spi_clk_isr, RISING);
+    attachInterrupt(digitalPinToInterrupt(PIN_MOSI), spi_mosi_isr, CHANGE);
+
+    WiFi.mode(WIFI_STA);
+
+    if (esp_now_init() != 0) {
+      Serial.println("Error initializing ESP-NOW");
+      return;
+    }
+
+    esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+    esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+
+    delay(1000);
+    Serial.println("SPI sniffing ready");
+  }
 }
 
 void loop()
 {
-  if (gotData)
+  // A1, A2, A1 Select this channel order to start webupdater 
+  if (channelHistory[0] == 0 && channelHistory[1] == 1 && channelHistory[2] == 0)
   {
-    // Serial.println(spiData, BIN);
+    EEPROM.put(0, true);
+    EEPROM.commit();  
+    Serial.println("Restarting in webupdater mode...");
+    ESP.restart();
+  }
 
-    if ((spiData & ADDRESS_BITS) == SPI_ADDRESS_SYNTH_B)
+  if (startWebUpdater)
+  {
+    HandleWebUpdate();
+  }
+  else
+  {
+    if (gotData)
     {
-      // Serial.println((spiData >> 5) & DATA_BITS);
+      Serial.println(spiData, BIN);
+      // Serial.println(numberOfBitsReceived);
 
-      for (uint8_t i = 0; i < 48; i++)
+      if ((spiData & ADDRESS_BITS) == SPI_ADDRESS_SYNTH_B)
       {
-        if (((spiData >> 5) & DATA_BITS) == hexFreqTable[i])
+        // Serial.println((spiData >> 5) & DATA_BITS);
+
+        for (uint8_t i = 0; i < 48; i++)
         {
-          Serial.println(i);
-          
-          uint8_t payload[4] = {i, 0, 1, 0};
-          sendToExLRS(MSP_SET_VTX_CONFIG, sizeof(payload), (uint8_t *) &payload);
+          if (((spiData >> 5) & DATA_BITS) == hexFreqTable[i])
+          {
+            Serial.println(i);
+            
+            uint8_t payload[4] = {i, 0, 1, 0};
+            sendToExLRS(MSP_SET_VTX_CONFIG, sizeof(payload), (uint8_t *) &payload);
+
+            channelHistory[2] = channelHistory[1];
+            channelHistory[1] = channelHistory[0];
+            channelHistory[0] = i;
+          }
         }
       }
-    }
 
-    gotData = false;
+      gotData = false;
+    }
   }
 }
