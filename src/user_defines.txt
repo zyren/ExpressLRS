@@ -11,7 +11,7 @@
 ### BINDING PHRASE: ###
 # Uncomment the line below to use a hardcoded binding phrase
 # Leave commented to use traditional binding
-#-DMY_BINDING_PHRASE="default ExpressLRS binding phrase"
+-DMY_BINDING_PHRASE="snipes"
 
 
 ### REGULATORY DOMAIN: ###
@@ -21,12 +21,12 @@
 #-DRegulatory_Domain_AU_433
 #-DRegulatory_Domain_EU_433
 #-DRegulatory_Domain_FCC_915
-#-DRegulatory_Domain_ISM_2400
+-DRegulatory_Domain_ISM_2400
 
 
 ### SWITCHES: ###
 
-#-DHYBRID_SWITCHES_8
+-DHYBRID_SWITCHES_8
 
 
 ### PERFORMANCE OPTIONS: ###
@@ -58,7 +58,7 @@
 #-DMY_STARTUP_MELODY="B5 16 P16 B5 16 P16 B5 16 P16 B5 2 G5 2 A5 2 B5 8 P4 A5 8 B5 1|140|-3"
 
 # Comment this to disable advanced telemetry.
-#-DENABLE_TELEMETRY
+-DENABLE_TELEMETRY
 
 #Comment this to disable diversity function
-#-DUSE_DIVERSITY
+-DUSE_DIVERSITY

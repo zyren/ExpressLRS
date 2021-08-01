@@ -522,6 +522,25 @@ Designed by NamimnoRC
 #define GPIO_PIN_FAN_EN         17
 #define GPIO_PIN_RFamp_APC2     25
 
+#elif defined(TARGET_TX_MAMBO)      // TBS MAMBO
+#define GPIO_PIN_NSS                PE3
+#define GPIO_PIN_BUSY               PE10
+#define GPIO_PIN_DIO1               PE11
+#define GPIO_PIN_MOSI               PC3
+#define GPIO_PIN_MISO               PC2
+#define GPIO_PIN_SCK                PB10
+#define GPIO_PIN_RST                PC13
+#define GPIO_PIN_TX_ENABLE          PA6
+#define GPIO_PIN_RX_ENABLE          PB14
+#define GPIO_PIN_ANT_CTRL_1         PA9
+#define GPIO_PIN_ANT_CTRL_2         PB13
+#define GPIO_PIN_RCSIGNAL_RX        PC7     // S.PORT (Only needs one wire )
+#define GPIO_PIN_RCSIGNAL_TX        PC6     // Needed for CRSF libs but does nothing/not hooked up to JR module.
+#define GPIO_PIN_LED_RED            PA1     // Red LED on dev board
+#define GPIO_PIN_SDA                PB5
+#define GPIO_PIN_SCL                PB3
+// #define GPIO_PIN_CS                 PA15
+
 #else
 #error "Unknown target!"
 #endif

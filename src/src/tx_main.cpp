@@ -63,6 +63,9 @@ const uint8_t thisCommit[6] = {LATEST_COMMIT};
 
 #define LUA_VERSION 3
 
+uint32_t lastLED = 0;
+bool ledState = false;
+
 /// define some libs to use ///
 hwTimer hwTimer;
 GENERIC_CRC14 ota_crc(ELRS_CRC14_POLY);
@@ -604,11 +607,13 @@ void ICACHE_RAM_ATTR TXdoneISR()
 
 void setup()
 {
+  pinMode(PA1, OUTPUT);
 #if defined(TARGET_TX_GHOST)
-  Serial.setTx(PA2);
-  Serial.setRx(PA3);
+  // Serial.setTx(PA2);
+  // Serial.setRx(PA3);
 #endif
   Serial.begin(460800);
+  SerialUSB.begin();
 
   /**
    * Any TX's that have the WS2812 LED will use this the WS2812 LED pin
@@ -759,13 +764,30 @@ void setup()
   POWERMGNT.setPower((PowerLevels_e)config.GetPower());
 
   hwTimer.init();
-  //hwTimer.resume();  //uncomment to automatically start the RX timer and leave it running
+  hwTimer.resume();  //uncomment to automatically start the RX timer and leave it running
   crsf.Begin();
 }
 
 void loop()
 {
   uint32_t now = millis();
+  if (now - lastLED > 1000) {
+    if (ledState) {
+      digitalWrite(GPIO_PIN_LED_RED, LOW);
+      ledState = false;
+      // SerialUSB.println("On");
+    }
+    else {
+      digitalWrite(GPIO_PIN_LED_RED, HIGH);
+      // SerialUSB.println("Off");
+      ledState = true;
+    }
+    lastLED = now;
+  }
+  
+
+
+
   static bool mspTransferActive = false;
   #if WS2812_LED_IS_USED && !defined(TARGET_NAMIMNORC_TX)
       if ((connectionState == disconnected) && (now > (LEDupdateCounterMillis + LEDupdateInterval)))
@@ -802,14 +824,14 @@ void loop()
   {
     connectionState = disconnected;
     #if defined(GPIO_PIN_LED_RED) && (GPIO_PIN_LED_RED != UNDEF_PIN)
-    digitalWrite(GPIO_PIN_LED_RED, LOW ^ GPIO_LED_RED_INVERTED);
+    //digitalWrite(GPIO_PIN_LED_RED, LOW ^ GPIO_LED_RED_INVERTED);
     #endif // GPIO_PIN_LED_RED
   }
   else
   {
     connectionState = connected;
     #if defined(GPIO_PIN_LED_RED) && (GPIO_PIN_LED_RED != UNDEF_PIN)
-    digitalWrite(GPIO_PIN_LED_RED, HIGH ^ GPIO_LED_RED_INVERTED);
+    //digitalWrite(GPIO_PIN_LED_RED, HIGH ^ GPIO_LED_RED_INVERTED);
     #endif // GPIO_PIN_LED_RED
   }
 
