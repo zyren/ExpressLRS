@@ -607,13 +607,15 @@ void ICACHE_RAM_ATTR TXdoneISR()
 
 void setup()
 {
-  pinMode(PA1, OUTPUT);
 #if defined(TARGET_TX_GHOST)
-  // Serial.setTx(PA2);
-  // Serial.setRx(PA3);
+  Serial.setTx(PA2);
+  Serial.setRx(PA3);
 #endif
   Serial.begin(460800);
-  SerialUSB.begin();
+
+#if defined(TARGET_TX_MAMBO)
+  SerialUSB.begin(460800);
+#endif
 
   /**
    * Any TX's that have the WS2812 LED will use this the WS2812 LED pin
