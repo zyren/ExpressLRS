@@ -3,6 +3,8 @@
 #include <espnow.h>
 #include <EEPROM.h>
 
+#define WIFI_PIN            0
+#define LED_PIN             16
 #define PIN_MOSI            13
 #define PIN_CLK             14
 #define PIN_CS              12
@@ -26,7 +28,7 @@ uint16_t hexFreqTable[] = {
 0x2895, 0x288B, 0x2881, 0x2817, 0x2A0F, 0x2A19, 0x2A83, 0x2A8D, // E
 0x2906, 0x2910, 0x291A, 0x2984, 0x298E, 0x2998, 0x2A02, 0x2A0C, // F
 0x281D, 0x2890, 0x2902, 0x2915, 0x2987, 0x299A, 0x2A0C, 0x2A1F, // R
-0x2609, 0x261C, 0x268E, 0x2701, 0x2713, 0x2786, 0x2798, 0x280B  // L
+0x2609, 0x261C, 0x268E, 0x2701, 0x2713, 0x2786, 0x2798, 0x280B  // L  TODO check L Band HEX!!!
 };
 
 uint8_t broadcastAddress[] = {TX_MAC};  // r9 tx    50:02:91:DA:37:84
@@ -37,6 +39,7 @@ uint8_t numberOfBitsReceived = 0; // Takes into account 25b and 32b packets
 bool gotData = false;
 bool startWebUpdater = false;
 uint8_t channelHistory[3] = {255};
+uint8_t flashLED = false;
 
 void IRAM_ATTR spi_clk_isr();
 void IRAM_ATTR spi_cs_isr();
@@ -107,11 +110,13 @@ void sendToExLRS(uint16_t function, uint16_t payloadSize, const uint8_t *payload
     nowDataOutput[payloadSize+8] = ck2;
 
     esp_now_send(broadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
+
+    flashLED = true;
 }
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(460800);
 
   EEPROM.begin(512);
   EEPROM.get(0, startWebUpdater);
@@ -145,16 +150,30 @@ void setup()
     delay(1000);
     Serial.println("SPI sniffing ready");
   }
+
+  pinMode(WIFI_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+  
+  flashLED = true;
 }
 
 void loop()
 {
-  // A1, A2, A1 Select this channel order to start webupdater 
-  if (channelHistory[0] == 0 && channelHistory[1] == 1 && channelHistory[2] == 0)
+  // A1, A2, A1 Select this channel order to start webupdater
+  // Or press the boot button
+  if ( (channelHistory[0] == 0 && channelHistory[1] == 1 && channelHistory[2] == 0) || !digitalRead(WIFI_PIN) )
   {
     EEPROM.put(0, true);
-    EEPROM.commit();  
-    Serial.println("Restarting in webupdater mode...");
+    EEPROM.commit();
+    
+    for (int i = 0; i < 5; i++)
+    {
+      digitalWrite(LED_PIN, LOW);
+      delay(50);
+      digitalWrite(LED_PIN, HIGH);
+      delay(50);
+    }
+
     delay(500);
     ESP.restart();
   }
@@ -162,45 +181,43 @@ void loop()
   if (startWebUpdater)
   {
     HandleWebUpdate();
+    flashLED = true;
   }
   else
   {
     if (gotData)
     {
       gotData = false;
-      // Serial.println(spiData, BIN);
-      // Serial.println(numberOfBitsReceived);
 
       if ((spiData & ADDRESS_BITS) == SPI_ADDRESS_SYNTH_B)
       {
-        // Serial.println((spiData >> 5) & DATA_BITS);
-
         for (uint8_t i = 0; i < 48; i++)
         {
           if (((spiData >> 5) & DATA_BITS) == hexFreqTable[i])
           {
-            Serial.print("Channel index: ");
-            Serial.println(i);
-            
-            uint8_t payload[4] = {i, 0, 1, 0};
+            uint8_t payload[2] = {i, 0};
             sendToExLRS(MSP_SET_VTX_CONFIG, sizeof(payload), (uint8_t *) &payload);
 
             channelHistory[2] = channelHistory[1];
             channelHistory[1] = channelHistory[0];
             channelHistory[0] = i;
 
-            Serial.print("channelHistory: [");
-            Serial.print(channelHistory[0]);
-            Serial.print(", ");
-            Serial.print(channelHistory[1]);
-            Serial.print(", ");
-            Serial.print(channelHistory[2]);
-            Serial.println("]");
-
             return;
           }
         }
       }
+    }
+  }
+  
+  if (flashLED)
+  {
+    flashLED = false;
+    for (int i = 0; i < 4; i++)
+    {
+      digitalWrite(LED_PIN, LOW);
+      startWebUpdater == true ? delay(50) : delay(200);
+      digitalWrite(LED_PIN, HIGH);
+      startWebUpdater == true ? delay(50) : delay(200);
     }
   }
 }
