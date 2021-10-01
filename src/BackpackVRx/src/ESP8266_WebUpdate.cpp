@@ -1,5 +1,8 @@
 #include "ESP8266_WebUpdate.h"
 
+#ifdef RAPIDFIRE_BACKPACK
+  #define STASSID "ExpressLRS Rapidfire Backpack"
+#endif
 #ifdef VRX_BACKPACK
   #define STASSID "ExpressLRS VRx Backpack"
 #endif

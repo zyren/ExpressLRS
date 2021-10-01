@@ -7,7 +7,8 @@
 #define LED_PIN 16
 
 #define OPCODE_SET_CHANNEL  0x01
-#define OPCODE_WIFI_MODE    0x02
+#define OPCODE_SET_BAND     0x02
+#define OPCODE_WIFI_MODE    0x0F
 
 uint8_t flashLED = false;
 
@@ -32,7 +33,7 @@ void OnDataRecv(uint8_t * mac_addr, uint8_t *data, uint8_t data_len)
   flashLED = true;
 }
 
-void sendVRXChannelCmd(int channel)
+void sendVRXChannelCmd(uint8_t channel)
 {
     uint8_t nowDataOutput[2];
 
@@ -40,6 +41,18 @@ void sendVRXChannelCmd(int channel)
     nowDataOutput[1] = channel;
 
     Serial.println("sending channel change...");
+    
+    esp_now_send(broadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
+}
+
+void sendVRXBandCmd(uint8_t band)
+{
+    uint8_t nowDataOutput[2];
+
+    nowDataOutput[0] = OPCODE_SET_BAND;
+    nowDataOutput[1] = band;
+
+    Serial.println("sending band change...");
     
     esp_now_send(broadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
 }
@@ -128,7 +141,10 @@ void loop()
     }
   }
 
+  // test code
   sendVRXChannelCmd(channel);
+  delay(1000);
+  sendVRXBandCmd(0x01); // fatshark
 
   if (++channel > 8)
   {
