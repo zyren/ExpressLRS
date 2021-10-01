@@ -5,10 +5,18 @@
 
 #define WIFI_PIN 0
 #define LED_PIN 16
+
+#define OPCODE_SET_CHANNEL  0x01
+#define OPCODE_WIFI_MODE    0x02
+
 uint8_t flashLED = false;
 
 bool startWebUpdater = false;
 uint8_t channelHistory[3] = {255};
+
+uint8_t broadcastAddress[] = {TX_MAC};  // r9 tx    50:02:91:DA:37:84
+
+int channel = 1;  // testing only
 
 void OnDataRecv(uint8_t * mac_addr, uint8_t *data, uint8_t data_len)
 {
@@ -22,7 +30,30 @@ void OnDataRecv(uint8_t * mac_addr, uint8_t *data, uint8_t data_len)
   channelHistory[0] = data[8];
     
   flashLED = true;
-} 
+}
+
+void sendVRXChannelCmd(int channel)
+{
+    uint8_t nowDataOutput[2];
+
+    nowDataOutput[0] = OPCODE_SET_CHANNEL;
+    nowDataOutput[1] = channel;
+
+    Serial.println("sending channel change...");
+    
+    esp_now_send(broadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
+}
+
+void sendVRXWifiCmd()
+{
+    uint8_t nowDataOutput[1];
+
+    nowDataOutput[0] = OPCODE_WIFI_MODE;
+
+    Serial.println("sending wifi cmd...");
+    
+    esp_now_send(broadcastAddress, (uint8_t *) &nowDataOutput, sizeof(nowDataOutput));
+}
 
 void setup()
 {
@@ -46,7 +77,10 @@ void setup()
       ESP.restart();
     }
 
-    esp_now_register_recv_cb(OnDataRecv); 
+    esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+    esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+
+    // esp_now_register_recv_cb(OnDataRecv); 
   }
 
   pinMode(WIFI_PIN, INPUT);
@@ -93,4 +127,19 @@ void loop()
       startWebUpdater == true ? delay(50) : delay(200);
     }
   }
+
+  sendVRXChannelCmd(channel);
+
+  if (++channel > 8)
+  {
+    channel = 1;
+  }
+
+  if (millis() > 30000)
+  {
+    // test wifi cmd after 30s of uptime
+    sendVRXWifiCmd();
+  }
+
+  delay(1000);
 }
