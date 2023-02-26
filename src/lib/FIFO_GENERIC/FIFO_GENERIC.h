@@ -33,14 +33,14 @@
 #include "targets.h"
 #include "logging.h"
 
-template <uint32_t FIFO_SIZE>
+template <uint32_t FIFO_GENERIC_SIZE>
 class FIFO_GENERIC
 {
 private:
     uint32_t head;
     uint32_t tail;
     uint32_t numElements;
-    uint8_t buffer[FIFO_SIZE] = {0};
+    uint8_t buffer[FIFO_GENERIC_SIZE] = {0};
 #if defined(PLATFORM_ESP32)
     portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 #define ENTER_CRITICAL  portENTER_CRITICAL(&mux)
@@ -62,12 +62,12 @@ public:
         head = 0;
         tail = 0;
         numElements = 0;
-        memset(buffer, 0, FIFO_SIZE);
+        memset(buffer, 0, FIFO_GENERIC_SIZE);
     }
 
     void push(const uint8_t data)
     {
-        if (numElements == FIFO_SIZE)
+        if (numElements == FIFO_GENERIC_SIZE)
         {
             ERRLN("Buffer full, will flush");
             flush();
@@ -75,14 +75,14 @@ public:
         }
         ENTER_CRITICAL;
         buffer[tail] = data;
-        tail = (tail + 1) % FIFO_SIZE;
+        tail = (tail + 1) % FIFO_GENERIC_SIZE;
         numElements++;
         EXIT_CRITICAL;
     }
 
     void pushBytes(const uint8_t *data, uint32_t len)
     {
-        if (numElements + len > FIFO_SIZE)
+        if (numElements + len > FIFO_GENERIC_SIZE)
         {
             ERRLN("Buffer full, will flush");
             flush();
@@ -92,7 +92,7 @@ public:
         for (uint32_t i = 0; i < len; i++)
         {
             buffer[tail] = data[i];
-            tail = (tail + 1) % FIFO_SIZE;
+            tail = (tail + 1) % FIFO_GENERIC_SIZE;
         }
         numElements += len;
         EXIT_CRITICAL;
@@ -107,7 +107,7 @@ public:
         }
         ENTER_CRITICAL;
         uint8_t data = buffer[head];
-        head = (head + 1) % FIFO_SIZE;
+        head = (head + 1) % FIFO_GENERIC_SIZE;
         numElements--;
         EXIT_CRITICAL;
         return data;
@@ -125,7 +125,7 @@ public:
         for (uint32_t i = 0; i < len; i++)
         {
             data[i] = buffer[head];
-            head = (head + 1) % FIFO_SIZE;
+            head = (head + 1) % FIFO_GENERIC_SIZE;
         }
         numElements -= len;
         EXIT_CRITICAL;
@@ -147,7 +147,7 @@ public:
 
     uint16_t free()
     {
-        return FIFO_SIZE - numElements;
+        return FIFO_GENERIC_SIZE - numElements;
     }
 
     uint16_t size()
@@ -157,15 +157,14 @@ public:
 
     void pushSize(uint16_t size)
     {
-        push(size & 0xFF);
-        push((size >> 8) & 0xFF);
+        pushBytes(&size, 2);
     }
 
     uint16_t peekSize()
     {
         if (size() > 1)
         {
-            return (uint16_t)buffer[head] + ((uint16_t)buffer[(head + 1) % FIFO_SIZE] << 8);
+            return (uint16_t)buffer[head] + ((uint16_t)buffer[(head + 1) % FIFO_GENERIC_SIZE] << 8);
         }
         return 0;
     }
@@ -174,7 +173,9 @@ public:
     {
         if (size() > 1)
         {
-            return (uint16_t)pop() + ((uint16_t)pop() << 8);
+            uint16_t sz;
+            popBytes(&sz, 2);
+            return sz;
         }
         return 0;
     }

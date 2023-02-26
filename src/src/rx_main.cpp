@@ -25,6 +25,8 @@
 #include "devSerialUpdate.h"
 #include "devBaro.h"
 
+bool sendBufStats = false;
+
 #if defined(PLATFORM_ESP8266)
 #include <FS.h>
 #elif defined(PLATFORM_ESP32)
@@ -446,6 +448,11 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         if (firmwareOptions.is_airport)
         {
             OtaPackAirportData(&otaPkt, &apInputBuffer);
+
+            if (OtaNonce % 64 == 1)
+            {
+                sendBufStats = true;
+            }
         }
         else
         {
@@ -1253,7 +1260,7 @@ void HandleUARTin()
         if (firmwareOptions.is_airport)
         {
             uint8_t v = CRSF_RX_SERIAL.read();
-            if (apInputBuffer.size() < AP_MAX_BUF_LEN && connectionState == connected)
+            if (/*apInputBuffer.size() < AP_MAX_BUF_LEN && */connectionState == connected)
             {
                 apInputBuffer.push(v);
             }
@@ -1291,6 +1298,15 @@ static void HandleUARTout()
         while (apOutputBuffer.size())
         {
             Serial.write(apOutputBuffer.pop());
+        }
+
+        if (sendBufStats)
+        {
+            sendBufStats = false;
+            
+            Serial.print("\n\n\n");
+            Serial.printf("apInputBuffer.size() = %d", apInputBuffer.size());
+            Serial.print("\n\n\n");
         }
     }
 }
