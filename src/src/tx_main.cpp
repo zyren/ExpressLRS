@@ -35,8 +35,8 @@ Stream *TxBackpack;
 Stream *TxUSB;
 
 // Variables / constants for Airport //
-FIFO_GENERIC<AP_MAX_BUF_LEN> apInputBuffer;
-FIFO_GENERIC<AP_MAX_BUF_LEN> apOutputBuffer;
+FIFO_BASE* apInputBuffer;
+FIFO_BASE* apOutputBuffer;
 
 #if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
 unsigned long rebootTime = 0;
@@ -211,7 +211,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
     {
       if (firmwareOptions.is_airport)
       {
-        OtaUnpackAirportData(otaPktPtr, &apOutputBuffer);
+        OtaUnpackAirportData(otaPktPtr, apOutputBuffer);
         return true;
       }
       telemPtr = ota8->tlm_dl.payload;
@@ -232,7 +232,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
       case ELRS_TELEMETRY_TYPE_DATA:
         if (firmwareOptions.is_airport)
         {
-          OtaUnpackAirportData(otaPktPtr, &apOutputBuffer);
+          OtaUnpackAirportData(otaPktPtr, apOutputBuffer);
           return true;
         }
         TelemetryReceiver.ReceiveData(otaPktPtr->std.tlm_dl.packageIndex,
@@ -464,7 +464,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 
       if (firmwareOptions.is_airport)
       {
-        OtaPackAirportData(&otaPkt, &apInputBuffer);
+        OtaPackAirportData(&otaPkt, apInputBuffer);
       }
       else
       {
@@ -779,8 +779,8 @@ static void UpdateConnectDisconnectStatus()
 
       if (firmwareOptions.is_airport)
       {
-        apInputBuffer.flush();
-        apOutputBuffer.flush();
+        apInputBuffer->flush();
+        apOutputBuffer->flush();
       }
     }
   }
@@ -966,9 +966,9 @@ static void HandleUARTout()
 {
   if (firmwareOptions.is_airport)
   {
-    while (apOutputBuffer.size())
+    while (apOutputBuffer->size())
     {
-      TxUSB->write(apOutputBuffer.pop());
+      TxUSB->write(apOutputBuffer->pop());
     }
   }
 }
@@ -1215,6 +1215,8 @@ void setup()
 
   if (firmwareOptions.is_airport)
   {
+    apInputBuffer = new FIFO_GENERIC<AP_MAX_BUF_LEN>;
+    apOutputBuffer = new FIFO_GENERIC<AP_MAX_BUF_LEN>;
     config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
     config.SetMotionMode(0); // Ensure motion detection is off
     UARTconnected();
@@ -1266,9 +1268,9 @@ void loop()
 
   if (TxUSB->available())
   {
-    if (firmwareOptions.is_airport && apInputBuffer.size() < AP_MAX_BUF_LEN && connectionState == connected)
+    if (firmwareOptions.is_airport && apInputBuffer->size() < AP_MAX_BUF_LEN && connectionState == connected)
     {
-      apInputBuffer.push(TxUSB->read());
+      apInputBuffer->push(TxUSB->read());
     }
   }
 

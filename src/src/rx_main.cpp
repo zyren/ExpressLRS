@@ -116,8 +116,8 @@ CRSF crsf(CRSF_TX_SERIAL);
 #endif
 
 // Variables / constants for Airport //
-FIFO_GENERIC<AP_MAX_BUF_LEN> apInputBuffer;
-FIFO_GENERIC<AP_MAX_BUF_LEN> apOutputBuffer;
+FIFO_BASE* apInputBuffer;
+FIFO_BASE* apOutputBuffer;
 
 StubbornSender TelemetrySender;
 static uint8_t telemetryBurstCount;
@@ -409,7 +409,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
     alreadyTLMresp = true;
     otaPkt.std.type = PACKET_TYPE_TLM;
 
-    if ((NextTelemetryType == ELRS_TELEMETRY_TYPE_LINK || !TelemetrySender.IsActive()) && !firmwareOptions.is_airport)
+    if (NextTelemetryType == ELRS_TELEMETRY_TYPE_LINK || (!firmwareOptions.is_airport && !TelemetrySender.IsActive()))
     {
         OTA_LinkStats_s * ls;
         if (OtaIsFullRes)
@@ -447,7 +447,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
 
         if (firmwareOptions.is_airport)
         {
-            OtaPackAirportData(&otaPkt, &apInputBuffer);
+            OtaPackAirportData(&otaPkt, apInputBuffer);
         }
         else
         {
@@ -772,8 +772,8 @@ void GotConnection(unsigned long now)
 
     if (firmwareOptions.is_airport)
     {
-        apInputBuffer.flush();
-        apOutputBuffer.flush();
+        apInputBuffer->flush();
+        apOutputBuffer->flush();
     }
 
     DBGLN("got conn");
@@ -788,7 +788,7 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
 
     if (firmwareOptions.is_airport)
     {
-        OtaUnpackAirportData(otaPktPtr, &apOutputBuffer);
+        OtaUnpackAirportData(otaPktPtr, apOutputBuffer);
         return;
     }
 
@@ -1255,9 +1255,9 @@ void HandleUARTin()
         if (firmwareOptions.is_airport)
         {
             uint8_t v = CRSF_RX_SERIAL.read();
-            if (apInputBuffer.size() < AP_MAX_BUF_LEN && connectionState == connected)
+            if (apInputBuffer->size() < AP_MAX_BUF_LEN && connectionState == connected)
             {
-                apInputBuffer.push(v);
+                apInputBuffer->push(v);
             }
             continue;
         }
@@ -1291,7 +1291,7 @@ static void HandleUARTout()
     if (firmwareOptions.is_airport)
     {
         // Software-based flow control for mavlink
-        uint16_t percentageFull = (apInputBuffer.size() * 100) / 600; // 2x mavlink packets at max size of ~300bytes each
+        uint16_t percentageFull = (apInputBuffer->size() * 100) / 600; // 2x mavlink packets at max size of ~300bytes each
 
         if (OtaNonce % 64 == 1 || percentageFull > 50)
         {
@@ -1341,9 +1341,9 @@ static void HandleUARTout()
             // Serial.write(buf, len);
         }
 
-        while (apOutputBuffer.size())
+        while (apOutputBuffer->size())
         {
-            uint8_t c = apOutputBuffer.pop();
+            uint8_t c = apOutputBuffer->pop();
 
             mavlink_message_t msg;
             mavlink_status_t status;
@@ -1675,6 +1675,12 @@ void setup()
 #endif
 
     devicesStart();
+
+    if (firmwareOptions.is_airport)
+    {
+        apInputBuffer = new FIFO_GENERIC<AP_MAX_BUF_LEN>;
+        apOutputBuffer = new FIFO_GENERIC<AP_MAX_BUF_LEN>;
+    }
 }
 
 void loop()

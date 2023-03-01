@@ -579,7 +579,7 @@ void OtaUpdateSerializers(OtaSwitchMode_e const switchMode, uint8_t packetSize)
     OtaSwitchModeCurrent = switchMode;
 }
 
-void OtaPackAirportData(OTA_Packet_s * const otaPktPtr, FIFO_GENERIC<AP_MAX_BUF_LEN>  * inputBuffer)
+void OtaPackAirportData(OTA_Packet_s * const otaPktPtr, FIFO_BASE * inputBuffer)
 {
     uint16_t count = inputBuffer->size();
     if (OtaIsFullRes)
@@ -597,7 +597,7 @@ void OtaPackAirportData(OTA_Packet_s * const otaPktPtr, FIFO_GENERIC<AP_MAX_BUF_
     }
 }
 
-void OtaUnpackAirportData(OTA_Packet_s const * const otaPktPtr, FIFO_GENERIC<AP_MAX_BUF_LEN>  * outputBuffer)
+void OtaUnpackAirportData(OTA_Packet_s const * const otaPktPtr, FIFO_BASE * outputBuffer)
 {
     if (OtaIsFullRes)
     {

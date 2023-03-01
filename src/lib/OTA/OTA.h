@@ -187,8 +187,8 @@ typedef std::function<bool (OTA_Packet_s const * const otaPktPtr, CRSF * const c
 extern UnpackChannelData_t OtaUnpackChannelData;
 #endif
 
-void OtaPackAirportData(OTA_Packet_s * const otaPktPtr, FIFO_GENERIC<AP_MAX_BUF_LEN>  * inputBuffer);
-void OtaUnpackAirportData(OTA_Packet_s const * const otaPktPtr, FIFO_GENERIC<AP_MAX_BUF_LEN>  * outputBuffer);
+void OtaPackAirportData(OTA_Packet_s * const otaPktPtr, FIFO_BASE * inputBuffer);
+void OtaUnpackAirportData(OTA_Packet_s const * const otaPktPtr, FIFO_BASE * outputBuffer);
 
 #if defined(DEBUG_RCVR_LINKSTATS)
 extern uint32_t debugRcvrLinkstatsPacketId;
