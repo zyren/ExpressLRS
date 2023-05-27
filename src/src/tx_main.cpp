@@ -21,6 +21,21 @@
 #include "devPDET.h"
 #include "devBackpack.h"
 
+#include "common/mavlink.h"
+
+#include <SPI.h>
+#include <SD.h>
+
+// SD SPI pins
+#define SD_CS 13
+#define SD_SCK 14
+#define SD_MOSI 15
+#define SD_MISO 2
+#define SD_LOG_PATH "/airport_log.csv"
+bool sdLinkStatsReady = false;
+
+SPIClass sd_spi(HSPI);
+
 //// CONSTANTS ////
 #define MSP_PACKET_SEND_INTERVAL 10LU
 
@@ -211,6 +226,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
       LinkStatsFromOta(&ota8->tlm_dl.ul_link_stats.stats);
       telemPtr = ota8->tlm_dl.ul_link_stats.payload;
       dataLen = sizeof(ota8->tlm_dl.ul_link_stats.payload);
+      sdLinkStatsReady = true;
     }
     else
     {
@@ -232,6 +248,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
     {
       case ELRS_TELEMETRY_TYPE_LINK:
         LinkStatsFromOta(&otaPktPtr->std.tlm_dl.ul_link_stats.stats);
+        sdLinkStatsReady = true;
         break;
 
       case ELRS_TELEMETRY_TYPE_DATA:
@@ -1021,7 +1038,35 @@ static void HandleUARTout()
   {
     while (apOutputBuffer.size())
     {
-      TxUSB->write(apOutputBuffer.pop());
+      uint8_t c = apOutputBuffer.pop();
+      TxUSB->write(c);
+
+      mavlink_message_t msg;
+      mavlink_status_t status;
+
+      // Try parse a mavlink message
+      if (mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
+      {
+        // Message decoded successfully
+
+        // Check if its not heatbeat, and if not, inject radio stats
+        if (msg.msgid != MAVLINK_MSG_ID_HEARTBEAT)
+        {    
+          uint8_t rssi = 256 - crsf.LinkStatistics.downlink_RSSI;
+          uint8_t remrssi = 256 - crsf.LinkStatistics.uplink_RSSI_1;
+          uint8_t txbuf = crsf.LinkStatistics.uplink_Link_quality;
+          uint8_t noise = crsf.LinkStatistics.downlink_SNR;
+          uint8_t remnoise = crsf.LinkStatistics.uplink_SNR;
+          uint16_t rxerrors = 0;
+          uint16_t fixed = crsf.LinkStatistics.downlink_Link_quality;
+
+          uint8_t buf[MAVLINK_MSG_ID_RADIO_STATUS_LEN];
+          mavlink_message_t msg;
+          mavlink_msg_radio_status_pack(255, 0, &msg, rssi, remrssi, txbuf, noise, remnoise, rxerrors, fixed);
+          uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+          TxUSB->write(buf, len);
+        }
+      }
     }
   }
 }
@@ -1276,6 +1321,28 @@ void setup()
     config.SetMotionMode(0); // Ensure motion detection is off
     UARTconnected();
   }
+
+  sd_spi.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
+
+  if (!SD.begin(SD_CS, sd_spi))
+  {
+    DBGLN("SD Card: mounting failed");
+  } 
+  else
+  {
+    DBGLN("SD Card: mounted successfully");
+  }
+
+  File fd = SD.open(SD_LOG_PATH, FILE_APPEND);
+  if (!fd)
+  {
+    DBGLN("SD Card: writing file failed");
+  }
+  else
+  {
+    fd.println("UPTIME,1RSS,RSNR,RQTY,TRSS,TSNR,TQTY");
+    fd.close();
+  }
 }
 
 void loop()
@@ -1283,6 +1350,30 @@ void loop()
   uint32_t now = millis();
 
   HandleUARTout(); // Only used for non-CRSF output
+
+  if (sdLinkStatsReady)
+  {
+    File fd = SD.open(SD_LOG_PATH, FILE_APPEND);
+    if (!fd)
+    {
+      DBGLN("SD Card: writing file failed");
+    }
+    else
+    {
+      DBGLN("SD Card: appending data to %s.\n", SD_LOG_PATH);
+
+      fd.print(now); fd.print(",");
+      fd.print((int8_t)crsf.LinkStatistics.uplink_RSSI_1);  fd.print(",");
+      fd.print(crsf.LinkStatistics.uplink_SNR); fd.print(",");
+      fd.print(crsf.LinkStatistics.uplink_Link_quality); fd.print(",");
+      fd.print((int8_t)crsf.LinkStatistics.downlink_RSSI);  fd.print(",");
+      fd.print(crsf.LinkStatistics.downlink_SNR); fd.print(",");
+      fd.println(crsf.LinkStatistics.downlink_Link_quality);
+      
+      sdLinkStatsReady = false;
+      fd.close();
+    }
+  }
 
   #if defined(USE_BLE_JOYSTICK)
   if (connectionState != bleJoystick && connectionState != noCrossfire) // Wait until the correct crsf baud has been found
