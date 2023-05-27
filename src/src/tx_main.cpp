@@ -33,6 +33,7 @@
 #define SD_MISO 2
 #define SD_LOG_PATH "/airport_log.csv"
 bool sdLinkStatsReady = false;
+uint32_t lastLoggedStats = 0;
 
 SPIClass sd_spi(HSPI);
 
@@ -1351,8 +1352,10 @@ void loop()
 
   HandleUARTout(); // Only used for non-CRSF output
 
-  if (sdLinkStatsReady)
+  if (sdLinkStatsReady && now - lastLoggedStats > 1000)
   {
+    lastLoggedStats = now;
+    
     File fd = SD.open(SD_LOG_PATH, FILE_APPEND);
     if (!fd)
     {
