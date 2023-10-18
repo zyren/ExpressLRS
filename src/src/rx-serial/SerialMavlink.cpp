@@ -86,10 +86,10 @@ void SerialMavlink::handleUARTout()
     {
         lastSentFlowCtrl = now;
         
-        uint8_t rssi = 0;
-        uint8_t remrssi = 0;
+        uint8_t rssi = ((uint8_t)((float)CRSF::LinkStatistics.uplink_Link_quality * 2.55));
+        uint8_t remrssi = CRSF::LinkStatistics.uplink_RSSI_1;
         uint8_t txbuf = 0;
-        uint8_t noise = 0;
+        uint8_t noise = CRSF::LinkStatistics.uplink_SNR;
         uint8_t remnoise = 0;
         uint16_t rxerrors = 0;
         uint16_t fixed = 0;
@@ -162,14 +162,15 @@ void SerialMavlink::handleUARTout()
                         mavlink_msg_file_transfer_protocol_pack(msg.sysid, msg.compid, &msg2, 0, 0, target_component, (uint8_t*)url);
                         uint16_t len = mavlink_msg_to_send_buffer(buf, &msg2);
                         _outputPort->write(buf, len);
-                        return;
                     }
                 }
             }
-            
-            uint8_t buf[MAVLINK_MAX_PAYLOAD_LEN];
-            uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-            _outputPort->write(buf, len);
+            else
+            {
+                uint8_t buf[MAVLINK_MAX_PAYLOAD_LEN];
+                uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+                _outputPort->write(buf, len);
+            } 
         }
     }
 }
