@@ -1407,7 +1407,7 @@ void loop()
           for (uint8_t i = CRSF_FRAME_NOT_COUNTED_BYTES; i < count + CRSF_FRAME_NOT_COUNTED_BYTES; ++i)
           {
             TxUSB->write(CRSFinBuffer[i]);
-            TxBackpack->write(CRSFinBuffer[i]);
+            // TxBackpack->write(CRSFinBuffer[i]);
           }
         }
       }
